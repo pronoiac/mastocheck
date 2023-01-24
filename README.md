@@ -18,3 +18,7 @@ bundle exec mastocheck.rb [url]
 This was based on code from the Mastodon fork, [Hometown](https://github.com/hometown-fork/hometown/).
 Specifically, the file [`/app/services/verify_link_service.rb`](https://github.com/hometown-fork/hometown/blob/hometown-dev/app/services/verify_link_service.rb).
 This means this is derivative, and the license matches the above: AGPL 3.0.
+
+More info on `rel="me"` links:
+* [microformats wiki](https://microformats.org/wiki/rel-me)
+* [indieweb wiki](https://indieweb.org/rel-me)
