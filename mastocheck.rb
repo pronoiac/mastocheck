@@ -1,47 +1,41 @@
-# frozen_string_literal: true
+#!/usr/bin/env ruby
 
-class VerifyLinkService < BaseService
-  def call(field)
-    @link_back = ActivityPub::TagManager.instance.url_for(field.account)
-    @url       = field.value_for_verification
+require 'nokogiri'
+require 'byebug'
+require 'openssl'
+require 'http'
 
-    perform_request!
+uri = ARGV[0] || 'https://pronoiac.org/links/'
+@url = uri
 
-    return unless link_back_present?
-
-    field.mark_verified!
-  rescue OpenSSL::SSL::SSLError, HTTP::Error, Addressable::URI::InvalidURIError, Mastodon::HostValidationError, Mastodon::LengthValidationError => e
-    Rails.logger.debug "Error fetching link #{@url}: #{e}"
-    nil
+def perform_request!
+  response = HTTP[:accept => 'text/html'].get(@url)
+  if response.code == 200
+    @body = response.to_s
+  else
+    @body = nil
   end
+end
 
-  private
+def link_back_present?
+  return false if @body.empty?
 
-  def perform_request!
-    @body = Request.new(:get, @url).add_headers('Accept' => 'text/html').perform do |res|
-      res.code != 200 ? nil : res.body_with_limit
+  links = Nokogiri::HTML(@body).xpath('//a[contains(concat(" ", normalize-space(@rel), " "), " me ")]|//link[contains(concat(" ", normalize-space(@rel), " "), " me ")]')
+
+  if links.any?
+    links.each do |link|
+      puts link['href'].downcase
     end
   end
+end # /link_back_present
 
-  def link_back_present?
-    return false if @body.blank?
+begin
+  perform_request!
 
-    links = Nokogiri::HTML(@body).xpath('//a[contains(concat(" ", normalize-space(@rel), " "), " me ")]|//link[contains(concat(" ", normalize-space(@rel), " "), " me ")]')
+  return unless link_back_present?
 
-    if links.any? { |link| link['href'].downcase == @link_back.downcase }
-      true
-    elsif links.empty?
-      false
-    else
-      link_redirects_back?(links.first['href'])
-    end
-  end
-
-  def link_redirects_back?(test_url)
-    redirect_to_url = Request.new(:head, test_url, follow: false).perform do |res|
-      res.headers['Location']
-    end
-
-    redirect_to_url == @link_back
-  end
+rescue OpenSSL::SSL::SSLError, HTTP::Error, Addressable::URI::InvalidURIError
+  puts "Error fetching link #{@url}: #{e}"
+  return false
+  nil
 end
